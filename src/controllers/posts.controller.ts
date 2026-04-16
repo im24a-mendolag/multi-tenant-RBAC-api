@@ -1,8 +1,8 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import * as postsService from '../services/posts.service';
-import { assertOwnership } from '../services/rbac.service';
-import { BadRequestError } from '../types/errors';
+import { can, type Role } from '../services/policy';
+import { BadRequestError, ForbiddenError } from '../types/errors';
 
 const CreatePostSchema = z.object({
   title: z.string().min(1),
@@ -41,14 +41,15 @@ export const updatePost: RequestHandler = async (req, res) => {
   const result = UpdatePostSchema.safeParse(req.body);
   if (!result.success) throw new BadRequestError(result.error.issues[0].message);
 
-  // Fetch first to get the authorId for ownership check.
-  // tenantId from req.tenantContext prevents cross-tenant access (IDOR prevention).
   const postId = req.params.postId as string;
   const post = await postsService.getPost(postId, req.tenantContext!.tenantId);
 
-  // assertOwnership checks req.permissionScope — if 'own', the caller must be the author.
-  // If 'all', any user with posts:write can edit any post in the tenant.
-  assertOwnership(req, post.author.id);
+  // Re-check with the real isOwner value now that we have the resource.
+  // The middleware passed isOwner=true optimistically — this is the real gate.
+  const isOwner = post.author.id === req.user!.userId;
+  if (!can(req.effectiveRoles as Role[], 'write', 'posts', isOwner)) {
+    throw new ForbiddenError('You can only edit your own posts');
+  }
 
   const updated = await postsService.updatePost(postId, req.tenantContext!.tenantId, result.data);
   res.json(updated);
@@ -57,7 +58,12 @@ export const updatePost: RequestHandler = async (req, res) => {
 export const deletePost: RequestHandler = async (req, res) => {
   const postId = req.params.postId as string;
   const post = await postsService.getPost(postId, req.tenantContext!.tenantId);
-  assertOwnership(req, post.author.id);
+
+  const isOwner = post.author.id === req.user!.userId;
+  if (!can(req.effectiveRoles as Role[], 'delete', 'posts', isOwner)) {
+    throw new ForbiddenError('You can only delete your own posts');
+  }
+
   await postsService.deletePost(postId, req.tenantContext!.tenantId);
   res.status(204).send();
 };

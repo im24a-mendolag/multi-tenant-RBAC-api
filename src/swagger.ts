@@ -54,13 +54,6 @@ export const swaggerDocument = {
           name: { type: 'string' },
           description: { type: 'string' },
           parentRoleId: { type: 'string', format: 'uuid', nullable: true },
-          permissions: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: { permission: { type: 'object', properties: { name: { type: 'string' } } } },
-            },
-          },
         },
       },
       Post: {
@@ -93,12 +86,12 @@ export const swaggerDocument = {
       get: {
         tags: ['System'],
         summary: 'Show my resolved permissions in this tenant',
-        description: 'Returns every permission the calling user has in the specified tenant, including permissions inherited through the role hierarchy. Also shows the scope (all or own) for each permission. Useful for understanding what a role can do.',
+        description: 'Returns every permission the calling user has in the specified tenant, including permissions inherited through the role hierarchy. ownerOnly=true means the permission is granted only when the user is the resource owner (e.g. Viewer editing their own post).',
         security: [{ bearerAuth: [] }],
         parameters: [{ $ref: '#/components/parameters/TenantID' }],
         responses: {
           '200': {
-            description: 'Resolved permissions with scopes',
+            description: 'Resolved permissions',
             content: {
               'application/json': {
                 schema: {
@@ -112,7 +105,7 @@ export const swaggerDocument = {
                         type: 'object',
                         properties: {
                           permission: { type: 'string', example: 'posts:read' },
-                          scope: { type: 'string', enum: ['all', 'own'], example: 'all' },
+                          ownerOnly: { type: 'boolean', example: false },
                         },
                       },
                     },
@@ -122,10 +115,10 @@ export const swaggerDocument = {
                   userId: 'abc-123',
                   tenantId: 'def-456',
                   permissions: [
-                    { permission: 'posts:delete', scope: 'all' },
-                    { permission: 'posts:read', scope: 'all' },
-                    { permission: 'posts:write', scope: 'own' },
-                    { permission: 'tenants:read', scope: 'all' },
+                    { permission: 'posts:delete', ownerOnly: false },
+                    { permission: 'posts:read', ownerOnly: false },
+                    { permission: 'posts:write', ownerOnly: true },
+                    { permission: 'tenants:read', ownerOnly: false },
                   ],
                 },
               },
@@ -296,7 +289,6 @@ export const swaggerDocument = {
                 properties: {
                   email: { type: 'string', format: 'email' },
                   roleId: { type: 'string', format: 'uuid' },
-                  scope: { type: 'string', enum: ['all', 'own'], default: 'all' },
                 },
               },
             },
@@ -338,7 +330,6 @@ export const swaggerDocument = {
                 required: ['roleId'],
                 properties: {
                   roleId: { type: 'string', format: 'uuid' },
-                  scope: { type: 'string', enum: ['all', 'own'], default: 'all' },
                 },
               },
             },
@@ -372,7 +363,7 @@ export const swaggerDocument = {
           { name: 'tenantId', in: 'path', required: true, schema: { type: 'string' } },
           { $ref: '#/components/parameters/TenantID' },
         ],
-        responses: { '200': { description: 'Array of roles with permissions and parent', content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/Role' } } } } } },
+        responses: { '200': { description: 'Array of roles with parent', content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/Role' } } } } } },
       },
       post: {
         tags: ['Roles'],
@@ -392,52 +383,13 @@ export const swaggerDocument = {
                 properties: {
                   name: { type: 'string' },
                   description: { type: 'string' },
-                  parentRoleId: { type: 'string', format: 'uuid', description: 'Role this one inherits permissions from' },
+                  parentRoleId: { type: 'string', format: 'uuid', description: 'Used for DB-level hierarchy display only (permissions are defined in policy.ts)' },
                 },
               },
             },
           },
         },
         responses: { '201': { description: 'Role created' }, '409': { description: 'Name already taken in this tenant' } },
-      },
-    },
-
-    '/tenants/{tenantId}/roles/permissions': {
-      get: {
-        tags: ['Roles'],
-        summary: 'List all valid permission strings',
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          { name: 'tenantId', in: 'path', required: true, schema: { type: 'string' } },
-          { $ref: '#/components/parameters/TenantID' },
-        ],
-        responses: { '200': { description: 'Global permission catalog' } },
-      },
-    },
-
-    '/tenants/{tenantId}/roles/{roleId}/permissions': {
-      put: {
-        tags: ['Roles'],
-        summary: 'Replace permissions on a role — requires roles:write',
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          { name: 'tenantId', in: 'path', required: true, schema: { type: 'string' } },
-          { name: 'roleId', in: 'path', required: true, schema: { type: 'string' } },
-          { $ref: '#/components/parameters/TenantID' },
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                required: ['permissions'],
-                properties: { permissions: { type: 'array', items: { type: 'string' }, example: ['posts:read', 'posts:write'] } },
-              },
-            },
-          },
-        },
-        responses: { '200': { description: 'Permissions updated' } },
       },
     },
 
@@ -510,8 +462,8 @@ export const swaggerDocument = {
       },
       put: {
         tags: ['Posts'],
-        summary: 'Update a post — requires posts:write (scope-aware)',
-        description: 'If the user\'s membership has scope=own, they can only edit their own posts.',
+        summary: 'Update a post — requires posts:write',
+        description: 'Editors and above can edit any post. Viewers can only edit posts they authored.',
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: 'postId', in: 'path', required: true, schema: { type: 'string' } },
@@ -527,17 +479,17 @@ export const swaggerDocument = {
             },
           },
         },
-        responses: { '200': { description: 'Updated post' }, '403': { description: 'Missing permission or scope=own on another user\'s post' } },
+        responses: { '200': { description: 'Updated post' }, '403': { description: 'Missing permission or attempting to edit another user\'s post as Viewer' } },
       },
       delete: {
         tags: ['Posts'],
-        summary: 'Delete a post — requires posts:delete (scope-aware)',
+        summary: 'Delete a post — requires posts:delete',
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: 'postId', in: 'path', required: true, schema: { type: 'string' } },
           { $ref: '#/components/parameters/TenantID' },
         ],
-        responses: { '204': { description: 'Deleted' }, '403': { description: 'Missing permission or scope=own on another user\'s post' } },
+        responses: { '204': { description: 'Deleted' }, '403': { description: 'Missing permission or attempting to delete another user\'s post as Viewer' } },
       },
     },
 

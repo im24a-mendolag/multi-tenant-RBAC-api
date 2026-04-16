@@ -8,7 +8,6 @@ export async function listRoles(tenantId: string) {
     where: { tenantId },
     include: {
       parentRole: { select: { id: true, name: true } },
-      permissions: { include: { permission: { select: { name: true } } } },
     },
     orderBy: { createdAt: 'asc' },
   });
@@ -21,7 +20,6 @@ export async function createRole(
   parentRoleId?: string,
 ) {
   if (parentRoleId) {
-    // Verify the parent role belongs to the same tenant
     const parent = await prisma.role.findFirst({ where: { id: parentRoleId, tenantId } });
     if (!parent) throw new NotFoundError('Parent role not found in this tenant');
   }
@@ -52,7 +50,6 @@ export async function deleteRole(roleId: string, tenantId: string) {
   const role = await prisma.role.findFirst({ where: { id: roleId, tenantId } });
   if (!role) throw new NotFoundError('Role not found');
 
-  // Check if any users are currently assigned this role
   const memberCount = await prisma.membership.count({
     where: { roleId, isActive: true },
   });
@@ -65,41 +62,10 @@ export async function deleteRole(roleId: string, tenantId: string) {
   await prisma.role.delete({ where: { id: roleId } });
 }
 
-// ─── Permission assignment ─────────────────────────────────────────────────────
-
-export async function setRolePermissions(roleId: string, tenantId: string, permissionNames: string[]) {
-  const role = await prisma.role.findFirst({ where: { id: roleId, tenantId } });
-  if (!role) throw new NotFoundError('Role not found');
-
-  // Validate all permission names exist
-  const permissions = await prisma.permission.findMany({
-    where: { name: { in: permissionNames } },
-  });
-
-  if (permissions.length !== permissionNames.length) {
-    const found = permissions.map((p) => p.name);
-    const unknown = permissionNames.filter((n) => !found.includes(n));
-    throw new BadRequestError(`Unknown permissions: ${unknown.join(', ')}`);
-  }
-
-  // Replace all permissions for this role atomically
-  await prisma.$transaction([
-    prisma.rolePermission.deleteMany({ where: { roleId } }),
-    prisma.rolePermission.createMany({
-      data: permissions.map((p) => ({ roleId, permissionId: p.id })),
-    }),
-  ]);
-
-  return prisma.role.findUnique({
-    where: { id: roleId },
-    include: { permissions: { include: { permission: true } } },
-  });
-}
-
 // ─── Role hierarchy ───────────────────────────────────────────────────────────
 
 // Set the parent role — with cycle detection.
-// A cycle (A → B → A) would cause infinite recursion in the permission CTE.
+// A cycle (A → B → A) would cause infinite recursion in the hierarchy walk.
 export async function setParentRole(roleId: string, tenantId: string, parentRoleId: string | null) {
   const role = await prisma.role.findFirst({ where: { id: roleId, tenantId } });
   if (!role) throw new NotFoundError('Role not found');
@@ -154,8 +120,4 @@ function isUniqueConstraintError(e: unknown): boolean {
     'code' in e &&
     (e as { code: string }).code === 'P2002'
   );
-}
-
-export async function listPermissions() {
-  return prisma.permission.findMany({ orderBy: { name: 'asc' } });
 }

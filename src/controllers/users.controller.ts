@@ -5,7 +5,6 @@ import { BadRequestError } from '../types/errors';
 
 const UpdateRoleSchema = z.object({
   roleId: z.string().uuid(),
-  scope: z.enum(['all', 'own']).default('all'),
 });
 
 export const listUsers: RequestHandler = async (req, res) => {
@@ -29,7 +28,6 @@ export const updateUserRole: RequestHandler = async (req, res) => {
     req.params.userId as string,
     req.tenantContext!.tenantId,
     result.data.roleId,
-    result.data.scope,
   );
   res.json(membership);
 };

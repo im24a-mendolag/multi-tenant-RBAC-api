@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { requireTenant } from '../middleware/requireTenant';
-import { requirePermission, requirePermissionOrOwn } from '../middleware/requirePermission';
+import { requirePermission } from '../middleware/requirePermission';
 import { auditLog } from '../middleware/auditLog';
 import * as postsController from '../controllers/posts.controller';
 
@@ -41,13 +41,11 @@ postsRouter.post(
   postsController.createPost,
 );
 
-// requirePermissionOrOwn: checks posts:write AND resolves scope (all | own).
-// The controller then calls assertOwnership(req, post.authorId).
 postsRouter.put(
   '/:postId',
   authenticate,
   requireTenant,
-  requirePermissionOrOwn('posts:write'),
+  requirePermission('posts:write'),
   auditLog('post.updated', (req) => `post:${req.params.postId}`),
   postsController.updatePost,
 );
@@ -56,7 +54,7 @@ postsRouter.delete(
   '/:postId',
   authenticate,
   requireTenant,
-  requirePermissionOrOwn('posts:delete'),
+  requirePermission('posts:delete'),
   auditLog('post.deleted', (req) => `post:${req.params.postId}`),
   postsController.deletePost,
 );

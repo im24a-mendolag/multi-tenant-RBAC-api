@@ -45,41 +45,20 @@ model Role {
   tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   parentRole  Role?            @relation("RoleHierarchy", fields: [parentRoleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   childRoles  Role[]           @relation("RoleHierarchy")
-  permissions RolePermission[]
   memberships Membership[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
 }
 
-// Global catalog of all valid permission strings (resource:action).
-// Seeded at startup — not user-managed.
-model Permission {
-  id    String           @id @default(uuid())
-  name  String           @unique // e.g. "posts:read", "users:write"
-  roles RolePermission[]
-}
-
-model RolePermission {
-  roleId       String
-  permissionId String
-
-  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-
-  @@id([roleId, permissionId])
-}
-
 // Explicit membership: one user can belong to many tenants with different roles.
 // isActive = false means the user was removed; enforced on every request so
 // removal takes effect immediately without waiting for JWT expiry.
-// scope = "all" | "own" — "own" restricts the user to acting on their own resources only.
 model Membership {
   id        String   @id @default(uuid())
   userId    String
   tenantId  String
   roleId    String
-  scope     String   @default("all") // "all" | "own"
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
@@ -121,7 +100,7 @@ model AuditLog {
   @@index([tenantId])
 }
 
-// Demo resource — used to demonstrate tenant isolation and ownership scopes.
+// Demo resource — used to demonstrate tenant isolation and ownership enforcement.
 model Post {
   id        String   @id @default(uuid())
   tenantId  String

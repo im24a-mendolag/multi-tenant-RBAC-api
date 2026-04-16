@@ -458,83 +458,6 @@
             "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}/roles", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantId}}", "roles"] }
           }
         },
-        {
-          "name": "List All Permissions (global catalog)",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
-              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
-            ],
-            "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}/roles/permissions", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantId}}", "roles", "permissions"] }
-          }
-        },
-        {
-          "name": "Create Custom Role (Moderator)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "const json = pm.response.json();",
-                  "if (pm.response.code === 201 && json.id) {",
-                  "  pm.collectionVariables.set('moderatorRoleId', json.id);",
-                  "  pm.test('Status 201', () => pm.response.to.have.status(201));",
-                  "} else if (pm.response.code === 409) {",
-                  "  console.log('Moderator role already exists — fetching from roles list');",
-                  "  pm.sendRequest({",
-                  "    url: pm.collectionVariables.get('baseUrl') + '/tenants/' + pm.collectionVariables.get('tenantId') + '/roles',",
-                  "    method: 'GET',",
-                  "    header: {",
-                  "      'Authorization': 'Bearer ' + pm.collectionVariables.get('aliceToken'),",
-                  "      'X-Tenant-ID': pm.collectionVariables.get('tenantId')",
-                  "    }",
-                  "  }, function(err, res) {",
-                  "    if (!err) {",
-                  "      const roles = res.json();",
-                  "      const mod = Array.isArray(roles) ? roles.find(r => r.name === 'Moderator') : null;",
-                  "      if (mod) {",
-                  "        pm.collectionVariables.set('moderatorRoleId', mod.id);",
-                  "        console.log('Moderator role ID saved from list: ' + mod.id);",
-                  "      }",
-                  "    }",
-                  "  });",
-                  "  pm.test('Moderator role already exists (idempotent OK)', () => pm.response.to.have.status(409));",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
-              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Moderator\",\n  \"description\": \"Can manage posts but not users\",\n  \"parentRoleId\": \"{{viewerRoleId}}\"\n}"
-            },
-            "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}/roles", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantId}}", "roles"] }
-          }
-        },
-        {
-          "name": "Set Permissions on Moderator Role",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
-              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"permissions\": [\"posts:write\", \"posts:delete\"]\n}"
-            },
-            "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}/roles/{{moderatorRoleId}}/permissions", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantId}}", "roles", "{{moderatorRoleId}}", "permissions"] }
-          }
-        }
       ]
     },
     {
@@ -720,13 +643,13 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"roleId\": \"{{editorRoleId}}\",\n  \"scope\": \"all\"\n}"
+              "raw": "{\n  \"roleId\": \"{{editorRoleId}}\"\n}"
             },
             "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}/users/{{bobUserId}}/role", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantId}}", "users", "{{bobUserId}}", "role"] }
           }
         },
         {
-          "name": "Downgrade Bob back to Viewer (scope=own)",
+          "name": "Downgrade Bob back to Viewer",
           "request": {
             "method": "PUT",
             "header": [
@@ -736,7 +659,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"roleId\": \"{{viewerRoleId}}\",\n  \"scope\": \"own\"\n}"
+              "raw": "{\n  \"roleId\": \"{{viewerRoleId}}\"\n}"
             },
             "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}/users/{{bobUserId}}/role", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantId}}", "users", "{{bobUserId}}", "role"] }
           }
@@ -838,13 +761,15 @@
           }
         },
         {
-          "name": "Bob tries to create a post (Viewer ❌ — no posts:write)",
+          "name": "Bob creates his own post (Viewer ✅ — ownership allows write)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Viewer cannot write posts — Editor+ only (403)', () => pm.response.to.have.status(403));"
+                  "const json = pm.response.json();",
+                  "if (json.id) pm.collectionVariables.set('bobPostId', json.id);",
+                  "pm.test('Viewer can create own post (201)', () => pm.response.to.have.status(201));"
                 ]
               }
             }
@@ -858,9 +783,61 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Bob tries to write\",\n  \"body\": \"This should be blocked.\"\n}"
+              "raw": "{\n  \"title\": \"Bob's own post\",\n  \"body\": \"Viewers can write and delete their own posts.\"\n}"
             },
             "url": { "raw": "{{baseUrl}}/posts", "host": ["{{baseUrl}}"], "path": ["posts"] }
+          }
+        },
+        {
+          "name": "Bob tries to edit Diana's post (Viewer ❌ — not the owner)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Viewer cannot edit posts they do not own (403)', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Bob hijacks Diana's post\",\n  \"body\": \"This should be blocked.\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/posts/{{dianaPostId}}", "host": ["{{baseUrl}}"], "path": ["posts", "{{dianaPostId}}"] }
+          }
+        },
+        {
+          "name": "Bob edits his own post (Viewer ✅ — is the owner)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Viewer can edit own post (200)', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Bob's own post (edited)\",\n  \"body\": \"Viewers can edit their own posts.\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/posts/{{bobPostId}}", "host": ["{{baseUrl}}"], "path": ["posts", "{{bobPostId}}"] }
           }
         }
       ]
@@ -1090,7 +1067,7 @@
                   "const json = pm.response.json();",
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
                   "pm.test('Has permissions array', () => pm.expect(json.permissions).to.be.an('array'));",
-                  "console.log('Alice permissions:', json.permissions.map(p => p.permission + ' (' + p.scope + ')').join(', '));"
+                  "console.log('Alice permissions:', json.permissions.map(p => p.permission + (p.ownerOnly ? ' (owner-only)' : '')).join(', '));"
                 ]
               }
             }
@@ -1117,7 +1094,7 @@
                   "pm.test('Admin inherits posts:read from Viewer', () => pm.expect(perms).to.include('posts:read'));",
                   "pm.test('Admin has users:write', () => pm.expect(perms).to.include('users:write'));",
                   "pm.test('Admin does NOT have users:delete (Owner only)', () => pm.expect(perms).to.not.include('users:delete'));",
-                  "console.log('Charlie permissions:', json.permissions.map(p => p.permission + ' (' + p.scope + ')').join(', '));"
+                  "console.log('Charlie permissions:', json.permissions.map(p => p.permission + (p.ownerOnly ? ' (owner-only)' : '')).join(', '));"
                 ]
               }
             }
@@ -1144,7 +1121,7 @@
                   "pm.test('Editor inherits posts:read from Viewer', () => pm.expect(perms).to.include('posts:read'));",
                   "pm.test('Editor has posts:write', () => pm.expect(perms).to.include('posts:write'));",
                   "pm.test('Editor does NOT have users:read (Admin+ only)', () => pm.expect(perms).to.not.include('users:read'));",
-                  "console.log('Diana permissions:', json.permissions.map(p => p.permission + ' (' + p.scope + ')').join(', '));"
+                  "console.log('Diana permissions:', json.permissions.map(p => p.permission + (p.ownerOnly ? ' (owner-only)' : '')).join(', '));"
                 ]
               }
             }
@@ -1170,7 +1147,7 @@
                   "const perms = json.permissions.map(p => p.permission);",
                   "pm.test('Viewer has posts:read', () => pm.expect(perms).to.include('posts:read'));",
                   "pm.test('Viewer does NOT have posts:delete', () => pm.expect(perms).to.not.include('posts:delete'));",
-                  "console.log('Bob permissions:', json.permissions.map(p => p.permission + ' (' + p.scope + ')').join(', '));"
+                  "console.log('Bob permissions:', json.permissions.map(p => p.permission + (p.ownerOnly ? ' (owner-only)' : '')).join(', '));"
                 ]
               }
             }

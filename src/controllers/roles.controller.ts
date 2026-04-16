@@ -14,10 +14,6 @@ const UpdateRoleSchema = z.object({
   description: z.string().optional(),
 });
 
-const SetPermissionsSchema = z.object({
-  permissions: z.array(z.string()).min(1),
-});
-
 const SetParentSchema = z.object({
   parentRoleId: z.string().uuid().nullable(),
 });
@@ -57,18 +53,6 @@ export const deleteRole: RequestHandler = async (req, res) => {
   res.status(204).send();
 };
 
-export const setPermissions: RequestHandler = async (req, res) => {
-  const result = SetPermissionsSchema.safeParse(req.body);
-  if (!result.success) throw new BadRequestError(result.error.issues[0].message);
-
-  const role = await rolesService.setRolePermissions(
-    req.params.roleId as string,
-    req.tenantContext!.tenantId,
-    result.data.permissions,
-  );
-  res.json(role);
-};
-
 export const setParent: RequestHandler = async (req, res) => {
   const result = SetParentSchema.safeParse(req.body);
   if (!result.success) throw new BadRequestError(result.error.issues[0].message);
@@ -79,9 +63,4 @@ export const setParent: RequestHandler = async (req, res) => {
     result.data.parentRoleId,
   );
   res.json(role);
-};
-
-export const listPermissions: RequestHandler = async (_req, res) => {
-  const perms = await rolesService.listPermissions();
-  res.json(perms);
 };

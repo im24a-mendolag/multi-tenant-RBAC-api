@@ -65,26 +65,31 @@ export function createApp() {
     authenticate,
     requireTenant,
     async (req, res) => {
-      const { getEffectivePermissions, getUserScope } = await import('./services/rbac.service');
+      const { getEffectiveRoles } = await import('./services/rbac.service');
+      const { can } = await import('./services/policy');
       const { userId } = req.user!;
       const { tenantId } = req.tenantContext!;
 
-      const permissions = await getEffectivePermissions(userId, tenantId);
-      const permissionList = [...permissions].sort();
+      const roles = await getEffectiveRoles(userId, tenantId);
 
-      // For each permission, also show the scope
-      const withScopes = await Promise.all(
-        permissionList.map(async (name) => ({
-          permission: name,
-          scope: await getUserScope(userId, tenantId, name),
-        }))
-      );
+      const ALL: [string, string][] = [
+        ['posts', 'read'],   ['posts', 'write'],   ['posts', 'delete'],
+        ['users', 'read'],   ['users', 'write'],   ['users', 'delete'],
+        ['roles', 'read'],   ['roles', 'write'],   ['roles', 'delete'],
+        ['tenants', 'read'], ['tenants', 'write'],
+        ['audit', 'read'],
+      ];
 
-      res.json({
-        userId,
-        tenantId,
-        permissions: withScopes,
-      });
+      // Filter to only permissions the user holds (optimistic: isOwner=true).
+      // Ownership-conditional entries (e.g. posts:write for Viewer) are marked ownerOnly=true.
+      const permissions = ALL
+        .filter(([asset, action]) => can(roles as any, action as any, asset as any, true))
+        .map(([asset, action]) => {
+          const unconditional = can(roles as any, action as any, asset as any, false);
+          return { permission: `${asset}:${action}`, ownerOnly: !unconditional };
+        });
+
+      res.json({ userId, tenantId, permissions });
     }
   );
 

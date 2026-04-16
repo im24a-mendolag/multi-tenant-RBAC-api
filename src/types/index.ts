@@ -23,4 +23,3 @@ export interface RefreshTokenPayload {
   jti: string;   // unique token ID
 }
 
-export type PermissionScope = 'all' | 'own';

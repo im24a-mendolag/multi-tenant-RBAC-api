@@ -1,5 +1,5 @@
 import { prisma } from '../prisma/client';
-import { NotFoundError, BadRequestError } from '../types/errors';
+import { NotFoundError } from '../types/errors';
 
 // ─── Users within a tenant ────────────────────────────────────────────────────
 
@@ -17,7 +17,6 @@ export async function listTenantUsers(tenantId: string) {
     email: m.user.email,
     isActive: m.user.isActive,
     role: m.role,
-    scope: m.scope,
     memberSince: m.createdAt,
   }));
 }
@@ -35,18 +34,12 @@ export async function getTenantUser(userId: string, tenantId: string) {
     userId: membership.userId,
     email: membership.user.email,
     role: membership.role,
-    scope: membership.scope,
     memberSince: membership.createdAt,
   };
 }
 
 // Change a user's role within a tenant.
-export async function updateUserRole(
-  userId: string,
-  tenantId: string,
-  newRoleId: string,
-  scope: 'all' | 'own' = 'all',
-) {
+export async function updateUserRole(userId: string, tenantId: string, newRoleId: string) {
   // Verify the role belongs to this tenant
   const role = await prisma.role.findFirst({ where: { id: newRoleId, tenantId } });
   if (!role) throw new NotFoundError('Role not found in this tenant');
@@ -56,14 +49,9 @@ export async function updateUserRole(
   });
   if (!membership) throw new NotFoundError('User is not a member of this tenant');
 
-  // Validate scope value
-  if (scope !== 'all' && scope !== 'own') {
-    throw new BadRequestError('scope must be "all" or "own"');
-  }
-
   return prisma.membership.update({
     where: { id: membership.id },
-    data: { roleId: newRoleId, scope },
+    data: { roleId: newRoleId },
     include: { role: { select: { id: true, name: true } } },
   });
 }

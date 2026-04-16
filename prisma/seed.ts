@@ -6,24 +6,6 @@ import { PrismaPg } from '@prisma/adapter-pg';
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
-// All valid permission strings in the system.
-// Format: "resource:action"
-// These are code-level constants — not user-defined — so they live here, not in user-facing APIs.
-const PERMISSIONS = [
-  'users:read',
-  'users:write',
-  'users:delete',
-  'roles:read',
-  'roles:write',
-  'roles:delete',
-  'posts:read',
-  'posts:write',
-  'posts:delete',
-  'tenants:read',
-  'tenants:write',
-  'audit:read',
-];
-
 // Demo users — one per role so every permission boundary can be demonstrated.
 const DEMO_USERS = [
   { email: 'alice@acme.com', password: 'password123' },   // Owner
@@ -33,17 +15,6 @@ const DEMO_USERS = [
 ];
 
 async function main() {
-  // ── Permissions ──────────────────────────────────────────────────────────────
-  console.log('Seeding permissions...');
-  for (const name of PERMISSIONS) {
-    await prisma.permission.upsert({
-      where: { name },
-      update: {},
-      create: { name },
-    });
-  }
-  console.log(`✅ Seeded ${PERMISSIONS.length} permissions`);
-
   // ── Demo users ────────────────────────────────────────────────────────────────
   console.log('Seeding demo users...');
   const users: Record<string, { id: string; email: string }> = {};
@@ -69,8 +40,7 @@ async function main() {
     });
 
     // Hierarchy: Owner → Admin → Editor → Viewer
-    // Each role only stores its *own* permissions.
-    // The recursive CTE in rbac.service.ts collects inherited permissions at query time.
+    // Permissions are defined in policy.ts — not stored in the DB.
     const viewer = await prisma.role.create({
       data: { tenantId: tenant.id, name: 'Viewer', description: 'Read-only access' },
     });
@@ -84,28 +54,9 @@ async function main() {
       data: { tenantId: tenant.id, name: 'Owner', description: 'Full control over the tenant', parentRoleId: admin.id },
     });
 
-    const allPerms = await prisma.permission.findMany();
-    const permByName = new Map(allPerms.map((p) => [p.name, p.id]));
-
-    const rolePermissions: [string, string[]][] = [
-      [viewer.id, ['posts:read', 'tenants:read']],
-      [editor.id, ['posts:write', 'posts:delete']],
-      [admin.id,  ['users:read', 'users:write', 'roles:read', 'roles:write', 'audit:read']],
-      [owner.id,  ['users:delete', 'roles:delete', 'tenants:write']],
-    ];
-
-    for (const [roleId, perms] of rolePermissions) {
-      for (const permName of perms) {
-        const permId = permByName.get(permName);
-        if (permId) {
-          await prisma.rolePermission.create({ data: { roleId, permissionId: permId } });
-        }
-      }
-    }
-
     // Assign Alice as Owner when we create the tenant fresh.
     await prisma.membership.create({
-      data: { userId: users['alice@acme.com'].id, tenantId: tenant.id, roleId: owner.id, scope: 'all' },
+      data: { userId: users['alice@acme.com'].id, tenantId: tenant.id, roleId: owner.id },
     });
 
     console.log('✅ Created demo tenant "acme" with role hierarchy');

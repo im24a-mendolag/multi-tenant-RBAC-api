@@ -48,43 +48,9 @@ export async function createTenant(name: string, slug: string, creatorUserId: st
       },
     });
 
-    // Assign permissions to each role (additive — children inherit parent's via CTE)
-    const permissionNames = [
-      ['Viewer', ['posts:read', 'tenants:read']],
-      ['Editor', ['posts:write', 'posts:delete']],
-      ['Admin', ['users:read', 'users:write', 'roles:read', 'roles:write', 'audit:read']],
-      ['Owner', ['users:delete', 'roles:delete', 'tenants:write']],
-    ] as const;
-
-    const allPermissions = await tx.permission.findMany();
-    const permMap = new Map(allPermissions.map((p) => [p.name, p.id]));
-
-    for (const [roleName, perms] of permissionNames) {
-      const roleId =
-        roleName === 'Viewer'
-          ? viewer.id
-          : roleName === 'Editor'
-            ? editor.id
-            : roleName === 'Admin'
-              ? admin.id
-              : owner.id;
-
-      for (const permName of perms) {
-        const permId = permMap.get(permName);
-        if (permId) {
-          await tx.rolePermission.create({ data: { roleId, permissionId: permId } });
-        }
-      }
-    }
-
     // Make the creator an Owner
     await tx.membership.create({
-      data: {
-        userId: creatorUserId,
-        tenantId: tenant.id,
-        roleId: owner.id,
-        scope: 'all',
-      },
+      data: { userId: creatorUserId, tenantId: tenant.id, roleId: owner.id },
     });
 
     return tenant;

@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../prisma/client';
-import { NotFoundError, ConflictError, BadRequestError } from '../types/errors';
+import { NotFoundError, ConflictError } from '../types/errors';
 
 /**
  * Invite a user to a tenant by email.
@@ -20,12 +20,7 @@ export async function inviteUserToTenant(
   tenantId: string,
   email: string,
   roleId: string,
-  scope: 'all' | 'own' = 'all',
 ) {
-  if (scope !== 'all' && scope !== 'own') {
-    throw new BadRequestError('scope must be "all" or "own"');
-  }
-
   // Verify role belongs to this tenant
   const role = await prisma.role.findFirst({ where: { id: roleId, tenantId } });
   if (!role) throw new NotFoundError('Role not found in this tenant');
@@ -60,14 +55,14 @@ export async function inviteUserToTenant(
   if (inactiveMembership) {
     const membership = await prisma.membership.update({
       where: { id: inactiveMembership.id },
-      data: { isActive: true, scope },
+      data: { isActive: true },
       include: { role: { select: { id: true, name: true } } },
     });
     return { user: { id: user.id, email: user.email }, membership, isNewUser };
   }
 
   const membership = await prisma.membership.create({
-    data: { userId: user.id, tenantId, roleId, scope },
+    data: { userId: user.id, tenantId, roleId },
     include: { role: { select: { id: true, name: true } } },
   });
 
