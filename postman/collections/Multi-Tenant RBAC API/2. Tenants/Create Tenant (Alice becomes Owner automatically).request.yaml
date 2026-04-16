@@ -1,0 +1,46 @@
+$kind: http-request
+url: "{{baseUrl}}/tenants"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{aliceToken}}
+body:
+  type: text
+  content: |-
+    {
+      "name": "Acme Corp",
+      "slug": "acme"
+    }
+scripts:
+  - type: afterResponse
+    code: >-
+      const json = pm.response.json();
+
+      if (pm.response.code === 201 && json.id) {
+        pm.collectionVariables.set('tenantId', json.id);
+        console.log('Tenant created, ID saved: ' + json.id);
+        pm.test('Status 201', () => pm.response.to.have.status(201));
+        pm.test('Has id and slug', () => {
+          pm.expect(json.id).to.be.a('string');
+          pm.expect(json.slug).to.equal('acme');
+        });
+      } else if (pm.response.code === 409) {
+        console.log('Tenant "acme" already exists — fetching from list');
+        pm.sendRequest({
+          url: pm.collectionVariables.get('baseUrl') + '/tenants',
+          method: 'GET',
+          header: { 'Authorization': 'Bearer ' + pm.collectionVariables.get('aliceToken') }
+        }, function(err, res) {
+          if (!err) {
+            const list = res.json();
+            const acme = Array.isArray(list) ? list.find(t => t.slug === 'acme') : null;
+            if (acme) {
+              pm.collectionVariables.set('tenantId', acme.id);
+              console.log('Tenant ID saved from list: ' + acme.id);
+            }
+          }
+        });
+        pm.test('Tenant already exists (idempotent OK)', () => pm.response.to.have.status(409));
+      }
+    language: text/javascript
+order: 1000

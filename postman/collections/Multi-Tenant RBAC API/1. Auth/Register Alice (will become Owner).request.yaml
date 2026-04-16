@@ -1,0 +1,39 @@
+$kind: http-request
+url: "{{baseUrl}}/auth/register"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "alice@acme.com",
+      "password": "password123"
+    }
+scripts:
+  - type: afterResponse
+    code: >-
+      const json = pm.response.json();
+
+      if (pm.response.code === 201 && json.accessToken) {
+        pm.collectionVariables.set('aliceToken', json.accessToken);
+        console.log('Alice registered, token saved');
+        pm.test('Status 201', () => pm.response.to.have.status(201));
+        pm.test('Returns tokens', () => pm.expect(json.accessToken).to.be.a('string'));
+      } else if (pm.response.code === 409) {
+        console.log('Alice already exists — logging in to get token');
+        pm.sendRequest({
+          url: pm.collectionVariables.get('baseUrl') + '/auth/login',
+          method: 'POST',
+          header: { 'Content-Type': 'application/json' },
+          body: { mode: 'raw', raw: JSON.stringify({ email: 'alice@acme.com', password: 'password123' }) }
+        }, function(err, res) {
+          if (!err && res.json().accessToken) {
+            pm.collectionVariables.set('aliceToken', res.json().accessToken);
+            console.log('Alice token saved via login fallback');
+          }
+        });
+        pm.test('Alice already registered (idempotent OK)', () => pm.response.to.have.status(409));
+      }
+    language: text/javascript
+order: 1000

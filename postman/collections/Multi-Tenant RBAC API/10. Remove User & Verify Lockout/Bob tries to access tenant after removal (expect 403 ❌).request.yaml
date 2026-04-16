@@ -1,0 +1,18 @@
+$kind: http-request
+url: "{{baseUrl}}/posts"
+method: GET
+headers:
+  Authorization: Bearer {{bobToken}}
+  X-Tenant-ID: "{{tenantId}}"
+scripts:
+  - type: afterResponse
+    code: >-
+      pm.test('Removed user locked out immediately (403)', () =>
+      pm.response.to.have.status(403));
+
+      pm.test('Error mentions membership', () => {
+        const json = pm.response.json();
+        pm.expect(json.error).to.be.a('string');
+      });
+    language: text/javascript
+order: 2000

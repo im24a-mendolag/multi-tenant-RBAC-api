@@ -1,0 +1,15 @@
+$kind: http-request
+url: "{{baseUrl}}/tenants/{{tenantId}}/users/{{bobUserId}}/role"
+method: PUT
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{aliceToken}}
+  X-Tenant-ID: "{{tenantId}}"
+body:
+  type: text
+  content: |-
+    {
+      "roleId": "{{editorRoleId}}",
+      "scope": "all"
+    }
+order: 5000

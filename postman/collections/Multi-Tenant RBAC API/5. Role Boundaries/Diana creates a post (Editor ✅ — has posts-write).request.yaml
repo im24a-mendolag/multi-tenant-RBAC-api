@@ -1,0 +1,26 @@
+$kind: http-request
+name: Diana creates a post (Editor ✅ — has posts:write)
+url: "{{baseUrl}}/posts"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{dianaToken}}
+  X-Tenant-ID: "{{tenantId}}"
+body:
+  type: text
+  content: |-
+    {
+      "title": "Hello from Diana",
+      "body": "Editors can write posts."
+    }
+scripts:
+  - type: afterResponse
+    code: >-
+      const json = pm.response.json();
+
+      if (json.id) pm.collectionVariables.set('dianaPostId', json.id);
+
+      pm.test('Editor can create posts (201)', () =>
+      pm.response.to.have.status(201));
+    language: text/javascript
+order: 3000

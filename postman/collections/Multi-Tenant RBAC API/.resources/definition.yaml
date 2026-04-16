@@ -1,0 +1,23 @@
+$kind: collection
+name: Multi-Tenant RBAC API
+description: Full demo collection — walks through tenant isolation, role
+  hierarchy, permission enforcement, ownership scopes, and audit logging.
+variables:
+  baseUrl: http://localhost:3000
+  aliceToken: ""
+  bobToken: ""
+  charlieToken: ""
+  dianaToken: ""
+  tenantId: ""
+  tenantBId: ""
+  postId: ""
+  bobUserId: ""
+  charlieUserId: ""
+  dianaUserId: ""
+  viewerRoleId: ""
+  editorRoleId: ""
+  adminRoleId: ""
+  aliceRefreshToken: ""
+  moderatorRoleId: ""
+  dianaPostId: ""
+  secretPostId: ""

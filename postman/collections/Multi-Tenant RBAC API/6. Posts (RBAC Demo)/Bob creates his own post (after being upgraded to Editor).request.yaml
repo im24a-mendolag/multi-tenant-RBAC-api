@@ -1,0 +1,21 @@
+$kind: http-request
+url: "{{baseUrl}}/posts"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{bobToken}}
+  X-Tenant-ID: "{{tenantId}}"
+body:
+  type: text
+  content: |-
+    {
+      "title": "Hello from Bob",
+      "body": "Bob can write posts now that he's an Editor."
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      const json = pm.response.json();
+      if (json.id) pm.collectionVariables.set('bobPostId', json.id);
+    language: text/javascript
+order: 4000

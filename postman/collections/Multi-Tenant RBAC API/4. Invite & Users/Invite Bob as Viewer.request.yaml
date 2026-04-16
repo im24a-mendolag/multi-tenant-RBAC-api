@@ -1,0 +1,25 @@
+$kind: http-request
+url: "{{baseUrl}}/tenants/{{tenantId}}/invite"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{aliceToken}}
+  X-Tenant-ID: "{{tenantId}}"
+body:
+  type: text
+  content: |-
+    {
+      "email": "bob@acme.com",
+      "roleId": "{{viewerRoleId}}"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      const json = pm.response.json();
+      if (json.user && json.user.id) {
+        pm.collectionVariables.set('bobUserId', json.user.id);
+        console.log('Bob user ID saved: ' + json.user.id);
+      }
+      pm.test('Status 201', () => pm.response.to.have.status(201));
+    language: text/javascript
+order: 1000

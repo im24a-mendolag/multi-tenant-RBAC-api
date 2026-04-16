@@ -1,0 +1,35 @@
+$kind: http-request
+url: "{{baseUrl}}/auth/register"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "charlie@acme.com",
+      "password": "password123"
+    }
+scripts:
+  - type: afterResponse
+    code: >-
+      const json = pm.response.json();
+
+      if (pm.response.code === 201 && json.accessToken) {
+        pm.collectionVariables.set('charlieToken', json.accessToken);
+        pm.test('Status 201', () => pm.response.to.have.status(201));
+      } else if (pm.response.code === 409) {
+        pm.sendRequest({
+          url: pm.collectionVariables.get('baseUrl') + '/auth/login',
+          method: 'POST',
+          header: { 'Content-Type': 'application/json' },
+          body: { mode: 'raw', raw: JSON.stringify({ email: 'charlie@acme.com', password: 'password123' }) }
+        }, function(err, res) {
+          if (!err && res.json().accessToken) {
+            pm.collectionVariables.set('charlieToken', res.json().accessToken);
+          }
+        });
+        pm.test('Charlie already registered (idempotent OK)', () => pm.response.to.have.status(409));
+      }
+    language: text/javascript
+order: 3000

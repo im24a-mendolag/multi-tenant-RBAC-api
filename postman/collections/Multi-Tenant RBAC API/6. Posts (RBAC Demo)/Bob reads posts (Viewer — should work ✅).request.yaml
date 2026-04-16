@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{baseUrl}}/posts"
+method: GET
+headers:
+  Authorization: Bearer {{bobToken}}
+  X-Tenant-ID: "{{tenantId}}"
+scripts:
+  - type: afterResponse
+    code: pm.test('Viewer can read posts (200)', () =>
+      pm.response.to.have.status(200));
+    language: text/javascript
+order: 2000

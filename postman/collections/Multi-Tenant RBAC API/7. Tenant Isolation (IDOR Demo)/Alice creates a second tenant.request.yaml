@@ -1,0 +1,40 @@
+$kind: http-request
+url: "{{baseUrl}}/tenants"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{aliceToken}}
+body:
+  type: text
+  content: |-
+    {
+      "name": "Beta Corp",
+      "slug": "beta"
+    }
+scripts:
+  - type: afterResponse
+    code: >-
+      const json = pm.response.json();
+
+      if (pm.response.code === 201 && json.id) {
+        pm.collectionVariables.set('tenantBId', json.id);
+        console.log('Tenant B ID saved: ' + json.id);
+      } else if (pm.response.code === 409) {
+        console.log('Tenant "beta" already exists — fetching from list');
+        pm.sendRequest({
+          url: pm.collectionVariables.get('baseUrl') + '/tenants',
+          method: 'GET',
+          header: { 'Authorization': 'Bearer ' + pm.collectionVariables.get('aliceToken') }
+        }, function(err, res) {
+          if (!err) {
+            const list = res.json();
+            const beta = Array.isArray(list) ? list.find(t => t.slug === 'beta') : null;
+            if (beta) {
+              pm.collectionVariables.set('tenantBId', beta.id);
+              console.log('Tenant B ID saved from list: ' + beta.id);
+            }
+          }
+        });
+      }
+    language: text/javascript
+order: 1000

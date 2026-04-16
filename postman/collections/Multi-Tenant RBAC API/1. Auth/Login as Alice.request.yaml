@@ -1,0 +1,27 @@
+$kind: http-request
+url: "{{baseUrl}}/auth/login"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "alice@acme.com",
+      "password": "password123"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      const json = pm.response.json();
+      if (json.accessToken) {
+        pm.collectionVariables.set('aliceToken', json.accessToken);
+        pm.collectionVariables.set('aliceRefreshToken', json.refreshToken);
+      }
+      pm.test('Status 200', () => pm.response.to.have.status(200));
+      pm.test('Returns access + refresh tokens', () => {
+        pm.expect(json.accessToken).to.be.a('string');
+        pm.expect(json.refreshToken).to.be.a('string');
+      });
+    language: text/javascript
+order: 5000

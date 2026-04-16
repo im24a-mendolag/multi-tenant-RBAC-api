@@ -1,0 +1,21 @@
+$kind: http-request
+name: Bob tries to create a post (Viewer ❌ — no posts:write)
+url: "{{baseUrl}}/posts"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{bobToken}}
+  X-Tenant-ID: "{{tenantId}}"
+body:
+  type: text
+  content: |-
+    {
+      "title": "Bob tries to write",
+      "body": "This should be blocked."
+    }
+scripts:
+  - type: afterResponse
+    code: pm.test('Viewer cannot write posts — Editor+ only (403)', () =>
+      pm.response.to.have.status(403));
+    language: text/javascript
+order: 5000

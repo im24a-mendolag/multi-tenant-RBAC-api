@@ -1,0 +1,13 @@
+$kind: http-request
+name: Bob tries to view audit log (expect 403 — no audit:read)
+url: "{{baseUrl}}/tenants/{{tenantId}}/audit"
+method: GET
+headers:
+  Authorization: Bearer {{bobToken}}
+  X-Tenant-ID: "{{tenantId}}"
+scripts:
+  - type: afterResponse
+    code: pm.test('Non-owner cannot read audit log (403)', () =>
+      pm.response.to.have.status(403));
+    language: text/javascript
+order: 2000

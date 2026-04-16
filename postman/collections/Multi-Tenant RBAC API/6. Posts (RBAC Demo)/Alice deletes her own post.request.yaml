@@ -1,0 +1,7 @@
+$kind: http-request
+url: "{{baseUrl}}/posts/{{postId}}"
+method: DELETE
+headers:
+  Authorization: Bearer {{aliceToken}}
+  X-Tenant-ID: "{{tenantId}}"
+order: 5000

@@ -1,0 +1,46 @@
+$kind: http-request
+url: "{{baseUrl}}/tenants/{{tenantId}}/roles"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{aliceToken}}
+  X-Tenant-ID: "{{tenantId}}"
+body:
+  type: text
+  content: |-
+    {
+      "name": "Moderator",
+      "description": "Can manage posts but not users",
+      "parentRoleId": "{{viewerRoleId}}"
+    }
+scripts:
+  - type: afterResponse
+    code: >-
+      const json = pm.response.json();
+
+      if (pm.response.code === 201 && json.id) {
+        pm.collectionVariables.set('moderatorRoleId', json.id);
+        pm.test('Status 201', () => pm.response.to.have.status(201));
+      } else if (pm.response.code === 409) {
+        console.log('Moderator role already exists — fetching from roles list');
+        pm.sendRequest({
+          url: pm.collectionVariables.get('baseUrl') + '/tenants/' + pm.collectionVariables.get('tenantId') + '/roles',
+          method: 'GET',
+          header: {
+            'Authorization': 'Bearer ' + pm.collectionVariables.get('aliceToken'),
+            'X-Tenant-ID': pm.collectionVariables.get('tenantId')
+          }
+        }, function(err, res) {
+          if (!err) {
+            const roles = res.json();
+            const mod = Array.isArray(roles) ? roles.find(r => r.name === 'Moderator') : null;
+            if (mod) {
+              pm.collectionVariables.set('moderatorRoleId', mod.id);
+              console.log('Moderator role ID saved from list: ' + mod.id);
+            }
+          }
+        });
+        pm.test('Moderator role already exists (idempotent OK)', () => pm.response.to.have.status(409));
+      }
+    language: text/javascript
+order: 3000

@@ -1,0 +1,13 @@
+$kind: http-request
+name: Charlie reads audit log (Admin ✅ — has audit:read)
+url: "{{baseUrl}}/tenants/{{tenantId}}/audit"
+method: GET
+headers:
+  Authorization: Bearer {{charlieToken}}
+  X-Tenant-ID: "{{tenantId}}"
+scripts:
+  - type: afterResponse
+    code: pm.test('Admin can read audit log (200)', () =>
+      pm.response.to.have.status(200));
+    language: text/javascript
+order: 1000

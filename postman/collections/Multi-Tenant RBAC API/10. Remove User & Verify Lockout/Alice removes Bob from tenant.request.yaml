@@ -1,0 +1,11 @@
+$kind: http-request
+url: "{{baseUrl}}/tenants/{{tenantId}}/users/{{bobUserId}}"
+method: DELETE
+headers:
+  Authorization: Bearer {{aliceToken}}
+  X-Tenant-ID: "{{tenantId}}"
+scripts:
+  - type: afterResponse
+    code: pm.test('User removed (204)', () => pm.response.to.have.status(204));
+    language: text/javascript
+order: 1000

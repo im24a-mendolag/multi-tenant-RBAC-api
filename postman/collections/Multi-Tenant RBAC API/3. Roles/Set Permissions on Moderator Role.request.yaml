@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{baseUrl}}/tenants/{{tenantId}}/roles/{{moderatorRoleId}}/permissions"
+method: PUT
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{aliceToken}}
+  X-Tenant-ID: "{{tenantId}}"
+body:
+  type: text
+  content: |-
+    {
+      "permissions": ["posts:write", "posts:delete"]
+    }
+order: 4000

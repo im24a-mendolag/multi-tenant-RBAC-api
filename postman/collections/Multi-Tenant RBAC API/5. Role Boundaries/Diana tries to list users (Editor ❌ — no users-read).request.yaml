@@ -1,0 +1,13 @@
+$kind: http-request
+name: Diana tries to list users (Editor ❌ — no users:read)
+url: "{{baseUrl}}/tenants/{{tenantId}}/users"
+method: GET
+headers:
+  Authorization: Bearer {{dianaToken}}
+  X-Tenant-ID: "{{tenantId}}"
+scripts:
+  - type: afterResponse
+    code: pm.test('Editor cannot read users — Admin+ only (403)', () =>
+      pm.response.to.have.status(403));
+    language: text/javascript
+order: 4000

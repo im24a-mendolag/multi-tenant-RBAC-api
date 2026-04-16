@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{baseUrl}}/posts"
+method: GET
+headers:
+  Authorization: Bearer {{bobToken}}
+  X-Tenant-ID: "{{tenantId}}"
+scripts:
+  - type: afterResponse
+    code: pm.test('Cross-tenant access blocked with 403', () =>
+      pm.response.to.have.status(403));
+    language: text/javascript
+order: 4000

@@ -1,0 +1,29 @@
+$kind: http-request
+name: Charlie — what can I do? (Admin)
+url: "{{baseUrl}}/me/permissions"
+method: GET
+headers:
+  Authorization: Bearer {{charlieToken}}
+  X-Tenant-ID: "{{tenantId}}"
+scripts:
+  - type: afterResponse
+    code: >-
+      const json = pm.response.json();
+
+      pm.test('Status 200', () => pm.response.to.have.status(200));
+
+      const perms = json.permissions.map(p => p.permission);
+
+      pm.test('Admin inherits posts:read from Viewer', () =>
+      pm.expect(perms).to.include('posts:read'));
+
+      pm.test('Admin has users:write', () =>
+      pm.expect(perms).to.include('users:write'));
+
+      pm.test('Admin does NOT have users:delete (Owner only)', () =>
+      pm.expect(perms).to.not.include('users:delete'));
+
+      console.log('Charlie permissions:', json.permissions.map(p => p.permission
+      + ' (' + p.scope + ')').join(', '));
+    language: text/javascript
+order: 2000

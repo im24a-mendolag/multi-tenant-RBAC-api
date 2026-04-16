@@ -1,0 +1,31 @@
+$kind: http-request
+url: "{{baseUrl}}/tenants/{{tenantId}}/users"
+method: GET
+headers:
+  Authorization: Bearer {{aliceToken}}
+  X-Tenant-ID: "{{tenantId}}"
+scripts:
+  - type: afterResponse
+    code: >-
+      const json = pm.response.json();
+
+      const bob = json.find(u => u.email === 'bob@acme.com');
+
+      const charlie = json.find(u => u.email === 'charlie@acme.com');
+
+      const diana = json.find(u => u.email === 'diana@acme.com');
+
+      if (bob) pm.collectionVariables.set('bobUserId', bob.userId);
+
+      if (charlie) pm.collectionVariables.set('charlieUserId', charlie.userId);
+
+      if (diana) pm.collectionVariables.set('dianaUserId', diana.userId);
+
+      pm.test('Status 200', () => pm.response.to.have.status(200));
+
+      pm.test('All 4 demo users are in the tenant', () => {
+        const emails = json.map(u => u.email);
+        ['alice@acme.com','bob@acme.com','charlie@acme.com','diana@acme.com'].forEach(e => pm.expect(emails).to.include(e));
+      });
+    language: text/javascript
+order: 4000

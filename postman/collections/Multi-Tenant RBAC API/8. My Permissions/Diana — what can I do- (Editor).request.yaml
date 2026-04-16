@@ -1,0 +1,29 @@
+$kind: http-request
+name: Diana — what can I do? (Editor)
+url: "{{baseUrl}}/me/permissions"
+method: GET
+headers:
+  Authorization: Bearer {{dianaToken}}
+  X-Tenant-ID: "{{tenantId}}"
+scripts:
+  - type: afterResponse
+    code: >-
+      const json = pm.response.json();
+
+      pm.test('Status 200', () => pm.response.to.have.status(200));
+
+      const perms = json.permissions.map(p => p.permission);
+
+      pm.test('Editor inherits posts:read from Viewer', () =>
+      pm.expect(perms).to.include('posts:read'));
+
+      pm.test('Editor has posts:write', () =>
+      pm.expect(perms).to.include('posts:write'));
+
+      pm.test('Editor does NOT have users:read (Admin+ only)', () =>
+      pm.expect(perms).to.not.include('users:read'));
+
+      console.log('Diana permissions:', json.permissions.map(p => p.permission +
+      ' (' + p.scope + ')').join(', '));
+    language: text/javascript
+order: 3000

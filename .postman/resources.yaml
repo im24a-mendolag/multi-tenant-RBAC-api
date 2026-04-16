@@ -1,0 +1,11 @@
+# Use this workspace to collaborate
+workspace:
+  id: 130ffde9-6de3-4924-8e7e-f4d8bb572c41
+
+localResources:
+  collections:
+    - ..\postman_collection.json
+
+cloudResources:
+  collections:
+    ..\postman\collections\Multi-Tenant RBAC API: 8e8d227c-4f78-4c4f-b5f6-fb1a95304527

@@ -1,0 +1,21 @@
+$kind: http-request
+name: Alice — what can I do? (Owner)
+url: "{{baseUrl}}/me/permissions"
+method: GET
+headers:
+  Authorization: Bearer {{aliceToken}}
+  X-Tenant-ID: "{{tenantId}}"
+scripts:
+  - type: afterResponse
+    code: >-
+      const json = pm.response.json();
+
+      pm.test('Status 200', () => pm.response.to.have.status(200));
+
+      pm.test('Has permissions array', () =>
+      pm.expect(json.permissions).to.be.an('array'));
+
+      console.log('Alice permissions:', json.permissions.map(p => p.permission +
+      ' (' + p.scope + ')').join(', '));
+    language: text/javascript
+order: 1000

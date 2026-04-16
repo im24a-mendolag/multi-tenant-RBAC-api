@@ -1,0 +1,7 @@
+$kind: http-request
+url: "{{baseUrl}}/tenants/{{tenantId}}/roles/permissions"
+method: GET
+headers:
+  Authorization: Bearer {{aliceToken}}
+  X-Tenant-ID: "{{tenantId}}"
+order: 2000

@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{baseUrl}}/posts/{{postId}}"
+method: DELETE
+headers:
+  Authorization: Bearer {{bobToken}}
+  X-Tenant-ID: "{{tenantId}}"
+scripts:
+  - type: afterResponse
+    code: pm.test('Viewer cannot delete posts (403)', () =>
+      pm.response.to.have.status(403));
+    language: text/javascript
+order: 3000

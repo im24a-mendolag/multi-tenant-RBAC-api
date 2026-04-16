@@ -1,0 +1,34 @@
+$kind: http-request
+url: "{{baseUrl}}/tenants/{{tenantId}}/roles"
+method: GET
+headers:
+  Authorization: Bearer {{aliceToken}}
+  X-Tenant-ID: "{{tenantId}}"
+scripts:
+  - type: afterResponse
+    code: >-
+      const json = pm.response.json();
+
+      const viewer = json.find(r => r.name === 'Viewer');
+
+      const editor = json.find(r => r.name === 'Editor');
+
+      const admin = json.find(r => r.name === 'Admin');
+
+      if (viewer) pm.collectionVariables.set('viewerRoleId', viewer.id);
+
+      if (editor) pm.collectionVariables.set('editorRoleId', editor.id);
+
+      if (admin) pm.collectionVariables.set('adminRoleId', admin.id);
+
+      pm.test('Status 200', () => pm.response.to.have.status(200));
+
+      pm.test('Has at least 4 default roles', () =>
+      pm.expect(json.length).to.be.at.least(4));
+
+      pm.test('Has Owner, Admin, Editor, Viewer', () => {
+        const names = json.map(r => r.name);
+        ['Owner','Admin','Editor','Viewer'].forEach(n => pm.expect(names).to.include(n));
+      });
+    language: text/javascript
+order: 1000

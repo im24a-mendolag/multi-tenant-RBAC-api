@@ -1,0 +1,26 @@
+$kind: http-request
+name: Bob — what can I do? (Viewer)
+url: "{{baseUrl}}/me/permissions"
+method: GET
+headers:
+  Authorization: Bearer {{bobToken}}
+  X-Tenant-ID: "{{tenantId}}"
+scripts:
+  - type: afterResponse
+    code: >-
+      const json = pm.response.json();
+
+      pm.test('Status 200', () => pm.response.to.have.status(200));
+
+      const perms = json.permissions.map(p => p.permission);
+
+      pm.test('Viewer has posts:read', () =>
+      pm.expect(perms).to.include('posts:read'));
+
+      pm.test('Viewer does NOT have posts:delete', () =>
+      pm.expect(perms).to.not.include('posts:delete'));
+
+      console.log('Bob permissions:', json.permissions.map(p => p.permission + '
+      (' + p.scope + ')').join(', '));
+    language: text/javascript
+order: 4000

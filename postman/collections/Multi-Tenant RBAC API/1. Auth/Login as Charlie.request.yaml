@@ -1,0 +1,23 @@
+$kind: http-request
+url: "{{baseUrl}}/auth/login"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "charlie@acme.com",
+      "password": "password123"
+    }
+scripts:
+  - type: afterResponse
+    code: >-
+      const json = pm.response.json();
+
+      if (json.accessToken) pm.collectionVariables.set('charlieToken',
+      json.accessToken);
+
+      pm.test('Status 200', () => pm.response.to.have.status(200));
+    language: text/javascript
+order: 7000

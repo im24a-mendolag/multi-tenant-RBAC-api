@@ -1,0 +1,22 @@
+$kind: http-request
+url: "{{baseUrl}}/posts"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{aliceToken}}
+  X-Tenant-ID: "{{tenantId}}"
+body:
+  type: text
+  content: |-
+    {
+      "title": "Hello from Alice",
+      "body": "This post was created by Alice who has the Owner role."
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      const json = pm.response.json();
+      if (json.id) pm.collectionVariables.set('postId', json.id);
+      pm.test('Status 201', () => pm.response.to.have.status(201));
+    language: text/javascript
+order: 1000

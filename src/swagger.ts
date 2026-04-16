@@ -89,6 +89,54 @@ export const swaggerDocument = {
       },
     },
 
+    '/me/permissions': {
+      get: {
+        tags: ['System'],
+        summary: 'Show my resolved permissions in this tenant',
+        description: 'Returns every permission the calling user has in the specified tenant, including permissions inherited through the role hierarchy. Also shows the scope (all or own) for each permission. Useful for understanding what a role can do.',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ $ref: '#/components/parameters/TenantID' }],
+        responses: {
+          '200': {
+            description: 'Resolved permissions with scopes',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    userId: { type: 'string', format: 'uuid' },
+                    tenantId: { type: 'string', format: 'uuid' },
+                    permissions: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          permission: { type: 'string', example: 'posts:read' },
+                          scope: { type: 'string', enum: ['all', 'own'], example: 'all' },
+                        },
+                      },
+                    },
+                  },
+                },
+                example: {
+                  userId: 'abc-123',
+                  tenantId: 'def-456',
+                  permissions: [
+                    { permission: 'posts:delete', scope: 'all' },
+                    { permission: 'posts:read', scope: 'all' },
+                    { permission: 'posts:write', scope: 'own' },
+                    { permission: 'tenants:read', scope: 'all' },
+                  ],
+                },
+              },
+            },
+          },
+          '401': { description: 'Missing or invalid token' },
+          '403': { description: 'Not a member of this tenant' },
+        },
+      },
+    },
+
     '/auth/register': {
       post: {
         tags: ['Auth'],

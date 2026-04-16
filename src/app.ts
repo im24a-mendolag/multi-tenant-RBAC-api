@@ -57,6 +57,37 @@ export function createApp() {
     next();
   }, auditRouter);
 
+  // ─── "Who am I?" endpoint ────────────────────────────────────────────────────
+  // Returns the calling user's resolved permissions for the current tenant.
+  // Useful for understanding what a role can do without reading the code.
+  app.get(
+    '/me/permissions',
+    authenticate,
+    requireTenant,
+    async (req, res) => {
+      const { getEffectivePermissions, getUserScope } = await import('./services/rbac.service');
+      const { userId } = req.user!;
+      const { tenantId } = req.tenantContext!;
+
+      const permissions = await getEffectivePermissions(userId, tenantId);
+      const permissionList = [...permissions].sort();
+
+      // For each permission, also show the scope
+      const withScopes = await Promise.all(
+        permissionList.map(async (name) => ({
+          permission: name,
+          scope: await getUserScope(userId, tenantId, name),
+        }))
+      );
+
+      res.json({
+        userId,
+        tenantId,
+        permissions: withScopes,
+      });
+    }
+  );
+
   // ─── Swagger UI ──────────────────────────────────────────────────────────────
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 

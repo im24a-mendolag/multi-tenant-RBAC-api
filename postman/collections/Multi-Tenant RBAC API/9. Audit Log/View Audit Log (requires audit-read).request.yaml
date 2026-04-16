@@ -1,0 +1,18 @@
+$kind: http-request
+name: View Audit Log (requires audit:read)
+url: "{{baseUrl}}/tenants/{{tenantId}}/audit"
+method: GET
+headers:
+  Authorization: Bearer {{aliceToken}}
+  X-Tenant-ID: "{{tenantId}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      const json = pm.response.json();
+      pm.test('Status 200', () => pm.response.to.have.status(200));
+      pm.test('Has logs and pagination', () => {
+        pm.expect(json.logs).to.be.an('array');
+        pm.expect(json.pagination).to.have.property('total');
+      });
+    language: text/javascript
+order: 1000
