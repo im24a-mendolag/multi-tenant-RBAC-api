@@ -1,0 +1,744 @@
+{
+  "info": {
+    "name": "Multi-Tenant RBAC API",
+    "description": "Full demo collection — walks through tenant isolation, role hierarchy, permission enforcement, ownership scopes, and audit logging.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "aliceToken", "value": "" },
+    { "key": "bobToken", "value": "" },
+    { "key": "tenantId", "value": "" },
+    { "key": "tenantBId", "value": "" },
+    { "key": "postId", "value": "" },
+    { "key": "bobUserId", "value": "" },
+    { "key": "viewerRoleId", "value": "" },
+    { "key": "editorRoleId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Register Alice (will become Owner)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.accessToken) {",
+                  "  pm.collectionVariables.set('aliceToken', json.accessToken);",
+                  "  console.log('Alice token saved');",
+                  "}",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Returns tokens', () => pm.expect(json.accessToken).to.be.a('string'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@acme.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }
+          }
+        },
+        {
+          "name": "Register Bob (will be invited as Viewer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.accessToken) {",
+                  "  pm.collectionVariables.set('bobToken', json.accessToken);",
+                  "  console.log('Bob token saved');",
+                  "}",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"bob@acme.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }
+          }
+        },
+        {
+          "name": "Login as Alice",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.accessToken) {",
+                  "  pm.collectionVariables.set('aliceToken', json.accessToken);",
+                  "  pm.collectionVariables.set('aliceRefreshToken', json.refreshToken);",
+                  "}",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns access + refresh tokens', () => {",
+                  "  pm.expect(json.accessToken).to.be.a('string');",
+                  "  pm.expect(json.refreshToken).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@acme.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Login as Bob",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.accessToken) {",
+                  "  pm.collectionVariables.set('bobToken', json.accessToken);",
+                  "}",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"bob@acme.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{aliceRefreshToken}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/refresh", "host": ["{{baseUrl}}"], "path": ["auth", "refresh"] }
+          }
+        },
+        {
+          "name": "Login — wrong password (expect 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Rejects wrong password with 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@acme.com\",\n  \"password\": \"wrongpassword\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Tenants",
+      "item": [
+        {
+          "name": "Create Tenant (Alice becomes Owner automatically)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) {",
+                  "  pm.collectionVariables.set('tenantId', json.id);",
+                  "  console.log('Tenant ID saved: ' + json.id);",
+                  "}",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Has id and slug', () => {",
+                  "  pm.expect(json.id).to.be.a('string');",
+                  "  pm.expect(json.slug).to.equal('acme');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Corp\",\n  \"slug\": \"acme\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/tenants", "host": ["{{baseUrl}}"], "path": ["tenants"] }
+          }
+        },
+        {
+          "name": "List My Tenants (Alice)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{aliceToken}}" }],
+            "url": { "raw": "{{baseUrl}}/tenants", "host": ["{{baseUrl}}"], "path": ["tenants"] }
+          }
+        },
+        {
+          "name": "Get Tenant Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantId}}"] }
+          }
+        },
+        {
+          "name": "Bob tries to access Alice's tenant (expect 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Cross-tenant access blocked with 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/posts", "host": ["{{baseUrl}}"], "path": ["posts"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Roles",
+      "item": [
+        {
+          "name": "List Roles (see Owner→Admin→Editor→Viewer hierarchy)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const viewer = json.find(r => r.name === 'Viewer');",
+                  "const editor = json.find(r => r.name === 'Editor');",
+                  "if (viewer) pm.collectionVariables.set('viewerRoleId', viewer.id);",
+                  "if (editor) pm.collectionVariables.set('editorRoleId', editor.id);",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has 4 default roles', () => pm.expect(json.length).to.equal(4));",
+                  "pm.test('Has Owner, Admin, Editor, Viewer', () => {",
+                  "  const names = json.map(r => r.name);",
+                  "  ['Owner','Admin','Editor','Viewer'].forEach(n => pm.expect(names).to.include(n));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}/roles", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantId}}", "roles"] }
+          }
+        },
+        {
+          "name": "List All Permissions (global catalog)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}/roles/permissions", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantId}}", "roles", "permissions"] }
+          }
+        },
+        {
+          "name": "Create Custom Role (Moderator)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) pm.collectionVariables.set('moderatorRoleId', json.id);",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Moderator\",\n  \"description\": \"Can manage posts but not users\",\n  \"parentRoleId\": \"{{viewerRoleId}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}/roles", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantId}}", "roles"] }
+          }
+        },
+        {
+          "name": "Set Permissions on Moderator Role",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissions\": [\"posts:write\", \"posts:delete\"]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}/roles/{{moderatorRoleId}}/permissions", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantId}}", "roles", "{{moderatorRoleId}}", "permissions"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Invite & Users",
+      "item": [
+        {
+          "name": "Invite Bob as Viewer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.user && json.user.id) {",
+                  "  pm.collectionVariables.set('bobUserId', json.user.id);",
+                  "  console.log('Bob user ID saved: ' + json.user.id);",
+                  "}",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"bob@acme.com\",\n  \"roleId\": \"{{viewerRoleId}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}/invite", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantId}}", "invite"] }
+          }
+        },
+        {
+          "name": "List Users in Tenant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const bob = json.find(u => u.email === 'bob@acme.com');",
+                  "if (bob) pm.collectionVariables.set('bobUserId', bob.userId);",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Bob is in the tenant', () => {",
+                  "  pm.expect(json.some(u => u.email === 'bob@acme.com')).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}/users", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantId}}", "users"] }
+          }
+        },
+        {
+          "name": "Upgrade Bob to Editor",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roleId\": \"{{editorRoleId}}\",\n  \"scope\": \"all\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}/users/{{bobUserId}}/role", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantId}}", "users", "{{bobUserId}}", "role"] }
+          }
+        },
+        {
+          "name": "Downgrade Bob back to Viewer (scope=own)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roleId\": \"{{viewerRoleId}}\",\n  \"scope\": \"own\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}/users/{{bobUserId}}/role", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantId}}", "users", "{{bobUserId}}", "role"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Posts (RBAC Demo)",
+      "item": [
+        {
+          "name": "Alice creates a post",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) pm.collectionVariables.set('postId', json.id);",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Hello from Alice\",\n  \"body\": \"This post was created by Alice who has the Owner role.\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/posts", "host": ["{{baseUrl}}"], "path": ["posts"] }
+          }
+        },
+        {
+          "name": "Bob reads posts (Viewer — should work ✅)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Viewer can read posts (200)', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/posts", "host": ["{{baseUrl}}"], "path": ["posts"] }
+          }
+        },
+        {
+          "name": "Bob tries to delete Alice's post (expect 403 ❌)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Viewer cannot delete posts (403)', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/posts/{{postId}}", "host": ["{{baseUrl}}"], "path": ["posts", "{{postId}}"] }
+          }
+        },
+        {
+          "name": "Bob creates his own post (after being upgraded to Editor)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) pm.collectionVariables.set('bobPostId', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Hello from Bob\",\n  \"body\": \"Bob can write posts now that he's an Editor.\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/posts", "host": ["{{baseUrl}}"], "path": ["posts"] }
+          }
+        },
+        {
+          "name": "Alice deletes her own post",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/posts/{{postId}}", "host": ["{{baseUrl}}"], "path": ["posts", "{{postId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Tenant Isolation (IDOR Demo)",
+      "item": [
+        {
+          "name": "Alice creates a second tenant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) pm.collectionVariables.set('tenantBId', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Beta Corp\",\n  \"slug\": \"beta\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/tenants", "host": ["{{baseUrl}}"], "path": ["tenants"] }
+          }
+        },
+        {
+          "name": "Alice creates a secret post in Tenant B",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) pm.collectionVariables.set('secretPostId', json.id);",
+                  "pm.test('Post created in Tenant B', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantBId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Secret post in Tenant B\",\n  \"body\": \"Bob should never see this.\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/posts", "host": ["{{baseUrl}}"], "path": ["posts"] }
+          }
+        },
+        {
+          "name": "Bob tries to read secret post by guessing its ID (expect 404 ❌)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('IDOR prevented — guessed ID returns 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/posts/{{secretPostId}}", "host": ["{{baseUrl}}"], "path": ["posts", "{{secretPostId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Remove User & Verify Lockout",
+      "item": [
+        {
+          "name": "Alice removes Bob from tenant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('User removed (204)', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}/users/{{bobUserId}}", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantId}}", "users", "{{bobUserId}}"] }
+          }
+        },
+        {
+          "name": "Bob tries to access tenant after removal (expect 403 ❌)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Removed user locked out immediately (403)', () => pm.response.to.have.status(403));",
+                  "pm.test('Error mentions membership', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.error).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/posts", "host": ["{{baseUrl}}"], "path": ["posts"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Audit Log",
+      "item": [
+        {
+          "name": "View Audit Log (requires audit:read)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has logs and pagination', () => {",
+                  "  pm.expect(json.logs).to.be.an('array');",
+                  "  pm.expect(json.pagination).to.have.property('total');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{aliceToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}/audit", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantId}}", "audit"] }
+          }
+        },
+        {
+          "name": "Bob tries to view audit log (expect 403 — no audit:read)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Non-owner cannot read audit log (403)', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bobToken}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenantId}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}/audit", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantId}}", "audit"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Health Check",
+      "item": [
+        {
+          "name": "Health Check (no auth required)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+          }
+        }
+      ]
+    }
+  ]
+}

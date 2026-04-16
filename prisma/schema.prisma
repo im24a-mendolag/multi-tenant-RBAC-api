@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Tenant {
+  id          String       @id @default(uuid())
+  name        String
+  slug        String       @unique
+  createdAt   DateTime     @default(now())
+
+  roles       Role[]
+  memberships Membership[]
+  posts       Post[]
+  auditLogs   AuditLog[]
+}
+
+model User {
+  id           String         @id @default(uuid())
+  email        String         @unique
+  passwordHash String
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+
+  memberships   Membership[]
+  posts         Post[]
+  auditLogs     AuditLog[]
+  refreshTokens RefreshToken[]
+}
+
+// Roles are scoped to a tenant.
+// parentRole enables hierarchy: a child role inherits all parent permissions.
+model Role {
+  id           String   @id @default(uuid())
+  tenantId     String
+  name         String
+  description  String?
+  parentRoleId String?
+  createdAt    DateTime @default(now())
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parentRole  Role?            @relation("RoleHierarchy", fields: [parentRoleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  childRoles  Role[]           @relation("RoleHierarchy")
+  permissions RolePermission[]
+  memberships Membership[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+// Global catalog of all valid permission strings (resource:action).
+// Seeded at startup — not user-managed.
+model Permission {
+  id    String           @id @default(uuid())
+  name  String           @unique // e.g. "posts:read", "users:write"
+  roles RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+// Explicit membership: one user can belong to many tenants with different roles.
+// isActive = false means the user was removed; enforced on every request so
+// removal takes effect immediately without waiting for JWT expiry.
+// scope = "all" | "own" — "own" restricts the user to acting on their own resources only.
+model Membership {
+  id        String   @id @default(uuid())
+  userId    String
+  tenantId  String
+  roleId    String
+  scope     String   @default("all") // "all" | "own"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId, roleId])
+  @@index([userId, tenantId])
+}
+
+// Refresh tokens stored as SHA-256 hash — the raw token is never persisted.
+// A compromised DB cannot be used to forge new sessions.
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Append-only audit trail of privileged actions.
+// ON DELETE SET NULL preserves audit records even after user/tenant deletion.
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String?
+  actorId   String?
+  action    String // e.g. "role.assign", "post.delete", "user.remove"
+  resource  String? // e.g. "post:uuid", "user:uuid"
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  actor  User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+}
+
+// Demo resource — used to demonstrate tenant isolation and ownership scopes.
+model Post {
+  id        String   @id @default(uuid())
+  tenantId  String
+  authorId  String
+  title     String
+  body      String
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  author User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
