@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerDocument } from './swagger';
 import { authRouter } from './routes/auth.routes';
 import { tenantsRouter } from './routes/tenants.routes';
 import { postsRouter } from './routes/posts.routes';
@@ -54,6 +56,9 @@ export function createApp() {
     if (!req.headers['x-tenant-id']) req.headers['x-tenant-id'] = req.params.tenantId;
     next();
   }, auditRouter);
+
+  // ─── Swagger UI ──────────────────────────────────────────────────────────────
+  app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
   // ─── Health check ────────────────────────────────────────────────────────────
 
