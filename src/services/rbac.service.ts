@@ -93,16 +93,36 @@ export async function getUserScope(
   tenantId: string,
   permission: string,
 ): Promise<PermissionScope> {
+  // Must use the same recursive CTE as getEffectivePermissions.
+  // The non-recursive version only checks the directly-assigned role, so inherited
+  // permissions (e.g. Owner inheriting posts:read from Viewer) return no rows and
+  // incorrectly fall through to the 'own' default.
+  // By propagating m.scope through every level of the hierarchy, we always return
+  // the scope that came from the user's actual membership row.
   const rows = await prisma.$queryRaw<{ scope: string }[]>`
-    SELECT DISTINCT m.scope
-    FROM "Membership" m
-    JOIN "Role" r           ON r.id           = m."roleId"
-    JOIN "RolePermission" rp ON rp."roleId"   = r.id
-    JOIN "Permission" p      ON p.id          = rp."permissionId"
-    WHERE m."userId"   = ${userId}
-      AND m."tenantId" = ${tenantId}
-      AND m."isActive" = TRUE
-      AND p.name       = ${permission}
+    WITH RECURSIVE role_hierarchy AS (
+
+      -- Base: directly assigned roles, carry the membership scope forward
+      SELECT r.id, r."parentRoleId", m.scope
+      FROM "Membership" m
+      JOIN "Role" r ON r.id = m."roleId"
+      WHERE m."userId"   = ${userId}
+        AND m."tenantId" = ${tenantId}
+        AND m."isActive" = TRUE
+
+      UNION
+
+      -- Recursive: parent roles inherit the same scope from the base membership
+      SELECT r.id, r."parentRoleId", rh.scope
+      FROM "Role" r
+      INNER JOIN role_hierarchy rh ON rh."parentRoleId" = r.id
+    )
+
+    SELECT DISTINCT rh.scope
+    FROM role_hierarchy rh
+    JOIN "RolePermission" rp ON rp."roleId" = rh.id
+    JOIN "Permission"    p  ON p.id        = rp."permissionId"
+    WHERE p.name = ${permission}
   `;
 
   // If any membership grants 'all', the effective scope is 'all'

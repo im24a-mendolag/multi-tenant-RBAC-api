@@ -17,6 +17,21 @@ Built with **Node.js + Express + TypeScript + PostgreSQL + Prisma**.
 
 ---
 
+## Demo credentials
+
+Password for all users: **`password123`**
+
+| User | Email | Role | Scope |
+|---|---|---|---|
+| Alice | alice@acme.com | Owner | all |
+| Charlie | charlie@acme.com | Admin | all |
+| Diana | diana@acme.com | Editor | all |
+| Bob | bob@acme.com | Viewer | own |
+
+Tenant slug: **acme** — Swagger UI: **http://localhost:3000/docs**
+
+---
+
 ## Quick start
 
 ### Prerequisites
